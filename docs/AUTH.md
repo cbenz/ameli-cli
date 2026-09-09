@@ -31,9 +31,14 @@ HTTP clients **and headless Chrome**. Read this before touching
    marker in the page proves the REST list was rendered — i.e. the session is
    really valid). A WAF "Request Rejected" page or an OAuth redirect to
    `ameliconnect.ameli.fr/oauth2/authorize` means the session is not valid.
-4. If not ready and interactive: wait (up to ~10 min) for the user to log in in
-   the visible window — credentials + double validation are **manual** (no
-   reliable pre-fill; FranceConnect is fully manual too).
+4. If not ready and interactive: wait (up to ~10 min) for the login form to
+   appear in the visible window. When credentials are configured (`[auth]
+   login`/`password`, with `command:` secrets resolved lazily), the form is
+   **pre-filled** (`#userfield` = numéro de sécurité sociale, `#passwordfield`)
+   and submitted once the page JS enables the button
+   (`#id_r_cnx_btn_submit`); the user only completes the **double validation**
+   (SMS / app). Without configured credentials — or through FranceConnect —
+   the login is fully manual.
 5. On success: harvest the cookies, refresh the cache, return the browser.
 
 ## Why a dedicated profile (not the user's personal Chrome)

@@ -7,15 +7,17 @@
 # is not alive)
 # login_url = "https://assure.ameli.fr/PortailAS/appmanager/PortailAS/assure?_nfpb=true&_pageLabel=as_accueil_page"
 
-# The login (numéro de sécurité sociale) and password are NOT used yet:
-# the login is manual in the visible Chrome window. Kept for future use.
+# The login (numéro de sécurité sociale, 13 digits, no spaces) and the password
+# pre-fill the login form automatically when a login is needed; only the double
+# validation (SMS / "Compte ameli" app) stays manual. Leave both commented for a
+# fully manual login.
 # The password may be produced by ANY shell command on your machine, using the
 # "command:" prefix, e.g.:
 #   password = "command:pass show ameli"
 #   password = "command:echo -n mypassword"
 # Uncomment and replace with your credentials. The login is the numéro de
 # sécurité sociale associated with your ameli account:
-# login = "2 85 12 75 114 008 31"
+# login = "2851275114008"
 # password = "changeme"
 
 # Unused: the portal rejects headless browsers (WAF), the window stays

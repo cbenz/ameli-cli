@@ -167,20 +167,24 @@ the logged-in page is reached.
 
 ### 5.3 Double validation & page handling
 
-- The portal login page is behind `_pageLabel=as_login_page` (J2EE portal,
-  server-rendered HTML). **To confirm during capture**: stable selectors of the
-  form, intermediate screens, cookie-consent banner, duration of the double
-  validation.
-- The double validation (SMS/app) **cannot** be reliably automated → it always
-  happens **in the visible window**, never headless; the headless probe only
-  checks for an existing session.
+- The login form (J2EE portal, server-rendered HTML,
+  `_pageLabel=as_login_page`) has stable selectors (captured 2026-09-09):
+  `#userfield` (numéro de sécurité sociale, 13 digits), `#passwordfield`, the
+  submit button `#id_r_cnx_btn_submit` (kept **disabled** by the page JS until
+  both fields are valid) and the cookie-consent banner `#accepteCookie`.
+- When configured, the CLI pre-fills those fields (`AmeliBrowser._try_prefill_login`)
+  and submits the form; the **double validation** (SMS/app) that follows
+  cannot be reliably automated → it always happens **in the visible window**.
+- Credentials (`[auth] login`/`password`) are only **resolved** (a `command:`
+  secret executed through `$SHELL -c`) when a login is actually needed, so a
+  secret command is not run on every cached-session run.
 - If the user logs in through **FranceConnect** (external identity provider),
   the CLI cannot pre-fill credentials: the login is fully manual in the visible
   window — documented behavior, identical to a login without configured
   credentials.
-- Credentials pre-fill is **best effort**: if the login fields cannot be
-  located reliably, the CLI instructs the user to log in manually in the window
-  and waits for the logged-in page.
+- Credentials pre-fill is **best effort**: if the fields cannot be filled or
+  the submit button stays disabled, the CLI instructs the user to log in
+  manually in the window and waits for the logged-in page.
 
 ## 6. HTTP client / API (`api.py`)
 

@@ -176,6 +176,11 @@ A live capture with a real login resolved the open items (details in
 - `ameli-cli list`/`sync` validated end‑to‑end on the real account (10 PDFs
   downloaded, filename `ReleveMensuel<Mois><Année>.pdf`, incremental skip by
   name).
+- **Login form**: single-step J2EE form with stable selectors (`#userfield` =
+  numéro de sécurité sociale, `#passwordfield`, submit `#id_r_cnx_btn_submit`
+  kept disabled until both fields are valid, cookie banner `#accepteCookie`).
+  `ameli-cli` pre-fills the configured credentials and submits; the double
+  validation (OTP SMS/app) stays manual.
 
 Remaining to confirm: real session lifetime (cache TTL), and the `x-app-version`
 drift.

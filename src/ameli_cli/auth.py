@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
@@ -45,6 +46,16 @@ _SESSION_DOMAINS = ("assure.ameli.fr", "ameli.fr")
 
 # Failure markers found on a blocked page.
 _REJECT_MARKERS = ("request rejected", "your support id")
+
+# ameli login form selectors (the J2EE portal `as_login_page`, captured
+# 2026-09-09): a single form with the numéro de sécurité sociale (`#userfield`)
+# + password (`#passwordfield`), submitted through a button the page JS only
+# enables once both fields are valid. The OTP / double-validation step that
+# follows is NOT automated (human only, in the visible window).
+_LOGIN_USER_SELECTOR = "#userfield"
+_LOGIN_PASSWORD_SELECTOR = "#passwordfield"
+_LOGIN_SUBMIT_SELECTOR = "#id_r_cnx_btn_submit"
+_COOKIE_ACCEPT_SELECTOR = "#accepteCookie"
 
 # Safety margin (seconds) before a cached session is considered expired.
 _SAFETY_MARGIN = 60
@@ -153,6 +164,12 @@ class AmeliBrowser:
         self._browser = None
         self._ctx = None
         self._page = None
+        # Credentials for the automatic (best-effort) login pre-fill. Set by
+        # `open_session` right before an interactive login; empty = fully
+        # manual login. `command:` secrets are already resolved at that point.
+        self.login: str = ""
+        self.password: str = ""
+        self._prefill_done = False
 
     # ── lifecycle ─────────────────────────────────────────────────────
 
@@ -299,12 +316,18 @@ class AmeliBrowser:
     ) -> bool:
         """Navigate to the archive and wait until it is ready.
 
-        In interactive mode, the user may log in (double validation) in the
-        visible window while we wait. Returns False on timeout/block."""
+        In interactive mode, the configured credentials pre-fill the login
+        form when it appears and the user completes the double validation
+        (SMS / app) in the visible window while we wait. Returns False on
+        timeout/block."""
         assert self._page is not None
         if interactive:
-            log.info("🔑 Please log in (numéro de sécurité sociale + password +")
-            log.info("   double validation) in the Chrome window, if asked.")
+            if self.login or self.password:
+                log.info("🔑 Login is pre-filled automatically — complete the double")
+                log.info("   validation (SMS / app) in the Chrome window, if asked.")
+            else:
+                log.info("🔑 Please log in (numéro de sécurité sociale + password +")
+                log.info("   double validation) in the Chrome window, if asked.")
         try:
             self._page.goto(archive_url, wait_until="domcontentloaded", timeout=60000)
         except PlaywrightError as exc:
@@ -314,8 +337,62 @@ class AmeliBrowser:
         while time.monotonic() < deadline:
             if self._archive_ready():
                 return True
+            if interactive:
+                self._try_prefill_login()
             self._page.wait_for_timeout(1000)
         return False
+
+    # ── automatic login pre-fill (best effort) ───────────────────────
+
+    def _try_prefill_login(self) -> bool:
+        """Fill and submit the ameli login form when it is displayed.
+
+        Called from the interactive wait until it has acted once. The double
+        validation (OTP: SMS code or "Compte ameli" app) is never automated —
+        after the submit the user finishes in the visible window. Returns True
+        once the form has been handled (filled, or unusable → manual login)."""
+        if self._prefill_done or self._page is None:
+            return False
+        page = self._page
+        if page.locator(_LOGIN_USER_SELECTOR).count() == 0:
+            return False  # the login form is not (yet) displayed
+        if not (self.login or self.password):
+            return False  # no credentials: stay fully manual
+
+        with contextlib.suppress(PlaywrightError):
+            accept = page.locator(_COOKIE_ACCEPT_SELECTOR)
+            if accept.count() and accept.is_visible():
+                accept.click()
+                log.info("🍪 Cookie-consent banner dismissed.")
+
+        with contextlib.suppress(PlaywrightError):
+            if self.login:
+                page.locator(_LOGIN_USER_SELECTOR).first.fill(self.login)
+                log.info("🔑 Numéro de sécurité sociale pre-filled.")
+            if self.password:
+                page.locator(_LOGIN_PASSWORD_SELECTOR).first.fill(self.password)
+                log.info("🔑 Password pre-filled.")
+
+        # Never retry within this wait, whatever happens next.
+        self._prefill_done = True
+        submit = page.locator(_LOGIN_SUBMIT_SELECTOR).first
+        try:
+            # The portal JS keeps the button disabled until both fields are
+            # valid; fill() dispatches the input events the page listens to.
+            page.wait_for_function(
+                """(sel) => {
+                    const b = document.querySelector(sel);
+                    return b !== null && !b.disabled;
+                }""",
+                arg=_LOGIN_SUBMIT_SELECTOR,
+                timeout=5000,
+            )
+            submit.click()
+            log.info("🔑 Login form submitted — complete the double validation (SMS / app).")
+        except PlaywrightError:
+            log.warning("⚠️  The login submit button stayed disabled — log in manually in")
+            log.warning("   the Chrome window (the credentials were still pre-filled).")
+        return True
 
     # ── same-origin REST calls ───────────────────────────────────────
 
@@ -359,6 +436,9 @@ def open_session(
     interactive: bool = True,
     fast_wait: float = 12.0,
     login_wait: float = 600.0,
+    login: str = "",
+    password: str = "",
+    resolve_secret: Callable[[str], str] | None = None,
 ) -> AmeliBrowser:
     """Open a dedicated Chrome and make sure the archive is reachable.
 
@@ -366,7 +446,9 @@ def open_session(
     1. open the (headful) dedicated Chrome on `chrome_dir`;
     2. inject the cached cookies, if any, and try the archive;
     3. if it is not reachable and `interactive`, wait for the user to log in in
-       the visible window;
+       the visible window — configured `login`/`password` (resolved lazily via
+       `resolve_secret` when a login is actually needed) feed a best-effort
+       pre-fill of the form; the double validation stays manual;
     4. on success, refresh the session cache from the live cookies and return
        the browser (the caller is responsible for closing it).
     Raises AuthenticationError on failure/cancel.
@@ -381,6 +463,18 @@ def open_session(
         ready = browser.ensure_archive(archive_url, wait_seconds=fast_wait, interactive=False)
         if not ready and interactive:
             log.info("🔑 No live session — a visible Chrome window is open for login.")
+            # Credentials are only resolved when a login is actually needed, so
+            # a `command:` secret is not executed on every (cached-session) run.
+            if resolve_secret is not None:
+                login = resolve_secret(login)
+                password = resolve_secret(password)
+            if login or password:
+                browser.login = login
+                browser.password = password
+                log.info(
+                    "🔑 Credentials configured — the login form will be pre-filled "
+                    "(best effort); the double validation stays manual."
+                )
             ready = browser.ensure_archive(archive_url, wait_seconds=login_wait, interactive=True)
 
         if not ready:

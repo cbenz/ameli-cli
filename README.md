@@ -19,9 +19,10 @@ a separate OAuth2-protected app whose session is carried by **cookies only**
 
 - `sync` / `list` / `login` open a **dedicated, visible Chrome** with its own
   profile, driven over the DevTools/CDP protocol — never your normal browser.
-- The first login is **manual**: numéro de sécurité sociale + password +
-  **double validation** (code by SMS or the "Compte ameli" mobile app), typed
-  right in the opened window.
+- The login is **pre-filled** with the credentials from the config file
+  (numéro de sécurité sociale + password, `command:`-resolved when needed);
+  only the **double validation** (code by SMS or the "Compte ameli" mobile
+  app) stays manual, typed right in the opened window.
 - The session cookies are then **harvested and cached** on disk
   (`session.json`) and **re-injected** into a fresh dedicated Chrome on later
   runs, so the interactive login is only needed again once the portal session
@@ -124,9 +125,12 @@ uncomment a line to override its default.
 [paths]       # download_dir, chrome_dir, session_cache
 ```
 
-> **Note**: the `login`, `password` and `headless` keys are accepted for
-> forward compatibility but are **not used yet** — the login is always manual
-> in the visible Chrome window, and the portal's WAF rejects headless Chrome.
+> The `login` (numéro de sécurité sociale) and `password` keys pre-fill the
+> login form automatically when a login is needed; the **double validation**
+> (SMS / app) always stays manual in the visible window. A `password` may come
+> from any shell command on the machine via the `command:` prefix. `headless`
+> is unused: the portal's WAF rejects headless Chrome, so the window stays
+> visible.
 
 ### File name template (`[download] file_mask`)
 

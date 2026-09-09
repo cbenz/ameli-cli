@@ -135,7 +135,7 @@ file > built-in default**.
 
 | Section | Keys | Meaning |
 | --- | --- | --- |
-| `[auth]` | `login_url`, `login`, `password`, `headless` | Portal entry point; credentials kept for future automatic pre-fill (the login is manual for now); `headless` unused (the WAF requires a visible window). |
+| `[auth]` | `login_url`, `login`, `password`, `headless` | Portal entry point; credentials used to **pre-fill** the login form when a login is needed (the double validation stays manual); `headless` unused (the WAF requires a visible window). |
 | `[api]` | `base_url`, `releves_url`, `collections` | Portal base URL; archive URL of the monthly statements; active collections (v1: `["RELEVES_MENSUELS"]`). |
 | `[download]` | `file_mask` | File name template for the downloaded statements (`{period}`, `{year}`, `{month}`, `{label}`; default `Relevé Mensuel {period}.pdf`). |
 | `[log]` | `level` | `DEBUG`, `INFO`, `WARNING`, `ERROR` (default `INFO`). |
@@ -176,10 +176,12 @@ All of them can be overridden under `[paths]` in the config file.
   run, and drives it over the DevTools protocol.
 - While the cached session is still valid, the cookies are re-injected and the
   archive opens **without re-login** (a window appears, but nothing to type).
-- Only when a real login is needed does the user log in **manually** in the
-  window — credentials (numéro de sécurité sociale + password) and the
-  **double validation** (SMS code or validation in the Compte ameli app) are
-  completed by hand; the window then closes and the session stays on disk.
+- Only when a real login is needed does the CLI **pre-fill** the login form in
+  the window — numéro de sécurité sociale + password, read from the config
+  (`command:` secrets resolved) — and submit it; the **double validation**
+  (SMS code or validation in the Compte ameli app) is completed by hand; the
+  window then closes and the session stays on disk. A login through
+  **FranceConnect** (no credentials to pre-fill) stays fully manual.
 - `logout --reset` is the full sign-out: session cache **and** browser profile
   are deleted.
 

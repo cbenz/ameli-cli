@@ -20,7 +20,9 @@ interactive double validation is only needed when the session has expired.
 import argparse
 import json
 import logging
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -195,16 +197,48 @@ def _bootstrap_paths(opts: CliOptions, cfg: Config) -> dict[str, Any]:
     }
 
 
+def _resolve_secret(value: str) -> str:
+    """Resolve a config secret. A `command:`-prefixed value runs the rest of
+    the string through `$SHELL -c` (non-interactive) and uses its stdout.
+
+    The command must be a *real executable* working in a non-interactive shell
+    (shell functions/aliases from ~/.zshrc are not loaded). On failure the CLI
+    warns and returns "" (the login proceeds without that credential)."""
+    if not value.startswith("command:"):
+        return value
+    command = value[len("command:") :]
+    shell = os.environ.get("SHELL") or "/bin/sh"
+    try:
+        result = subprocess.run(
+            [shell, "-c", command],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log.warning("⚠️  Cannot run `command:` secret (%s): %s", command, exc)
+        return ""
+    if result.returncode != 0:
+        log.warning("⚠️  `command:` secret failed (exit %s): %s", result.returncode, command)
+        return ""
+    return result.stdout.rstrip("\n")
+
+
 def _open_session(cfg: Config, ctx: dict[str, Any]) -> AmeliBrowser:
     """Open the dedicated Chrome and ensure the archive is reachable.
 
-    Raises AuthenticationError (→ exit code 1) if the login fails or is
-    cancelled."""
+    The configured credentials are passed along (resolved lazily, only when a
+    login is actually needed) so the login form can be pre-filled. Raises
+    AuthenticationError (→ exit code 1) if the login fails or is cancelled."""
     return open_session(
         archive_url=cfg.releves_url,
         chrome_dir=ctx["chrome_dir"],
         cache_path=ctx["session_cache"],
         interactive=True,
+        login=cfg.login,
+        password=cfg.password,
+        resolve_secret=_resolve_secret,
     )
 
 

@@ -1,0 +1,52 @@
+# ameli-cli configuration
+# Generated automatically on first run. Every key is OPTIONAL:
+# uncomment a line (and set a value) to override the built-in default.
+
+[auth]
+# Portal entry point (account home; the login form appears when the session
+# is not alive)
+# login_url = "https://assure.ameli.fr/PortailAS/appmanager/PortailAS/assure?_nfpb=true&_pageLabel=as_accueil_page"
+
+# The login (numéro de sécurité sociale) and password are NOT used yet:
+# the login is manual in the visible Chrome window. Kept for future use.
+# The password may be produced by ANY shell command on your machine, using the
+# "command:" prefix, e.g.:
+#   password = "command:pass show ameli"
+#   password = "command:echo -n mypassword"
+# Uncomment and replace with your credentials. The login is the numéro de
+# sécurité sociale associated with your ameli account:
+# login = "2 85 12 75 114 008 31"
+# password = "changeme"
+
+# Unused: the portal rejects headless browsers (WAF), the window stays
+# visible.
+# headless = false
+
+[api]
+# Base URL of the personal account portal
+# base_url = "https://assure.ameli.fr"
+# Monthly-statements archive URL
+# releves_url = "https://assure.ameli.fr/compte/aspm/releves-mensuels"
+# Collections to browse (v1: monthly statements only)
+# collections = ["RELEVES_MENSUELS"]
+
+[download]
+# File name template for the downloaded statements. Supported placeholders
+# (values are sanitized for the filesystem and the ".pdf" extension is ensured):
+#   {period}  YYYY-MM   (put it early to keep the folder chronologically sorted)
+#   {year}    YYYY
+#   {month}   MM
+#   {label}   human statement label, e.g. "Relevé mensuel juin 2026"
+# file_mask = "Relevé Mensuel {period}.pdf"
+
+[log]
+# Logging level: DEBUG, INFO, WARNING, ERROR
+# level = "INFO"
+
+[paths]
+# Download destination directory (default: ~/Documents/ameli)
+# download_dir = "~/Documents/ameli"
+# Dedicated Chrome profile (default: ~/.local/state/ameli-cli/chrome)
+# chrome_dir = "~/.local/state/ameli-cli/chrome"
+# Session cache (default: ~/.local/state/ameli-cli/session.json)
+# session_cache = "~/.local/state/ameli-cli/session.json"
